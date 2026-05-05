@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const response = await fetch(url);
     const data = await response.json();
 
-    const threshold = 10; // Your target threshold
+    const threshold = -5; // Your target threshold
     const assets = [
       { id: "bitcoin", ticker: "BTC" },
       { id: "ethereum", ticker: "ETH" },
