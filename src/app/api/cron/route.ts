@@ -3,13 +3,13 @@ import { sendTelegramAlert } from "@/lib/telegram";
 
 export async function GET(request: Request) {
   try {
-    // SECURITY CHECK: Look for the secret key in the URL
+    // SECURITY CHECK
     const { searchParams } = new URL(request.url);
     const secret = searchParams.get("secret");
 
     if (secret !== process.env.CRON_SECRET) {
       return NextResponse.json(
-        { error: "Unauthorized access. The Watchman ignores you." },
+        { error: "Unauthorized access." },
         { status: 401 },
       );
     }
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const response = await fetch(url);
     const data = await response.json();
 
-    const threshold = -5; // The "Blood in the Streets" threshold
+    const threshold = -5.0; // Your target threshold
     const assets = [
       { id: "bitcoin", ticker: "BTC" },
       { id: "ethereum", ticker: "ETH" },
@@ -31,10 +31,16 @@ export async function GET(request: Request) {
 
     for (const asset of assets) {
       const change = data[asset.id].usd_24h_change;
+
       if (change <= threshold) {
-        await sendTelegramAlert(
-          `🚨 <b>CRASH DETECTED</b>: ${asset.ticker} is down ${change.toFixed(2)}%!`,
-        );
+        // THE UPDATED MESSAGE FORMAT WITH THE LINK
+        const message =
+          `🚨 <b>WATCHMAN SIGNAL: STRONG BUY</b> 🚨\n\n` +
+          `<b>${asset.ticker}</b> is heavily oversold (Down ${change.toFixed(2)}%).\n` +
+          `Historically, this indicates a mean-reversion bounce.\n\n` +
+          `📊 <b>Action Hub:</b> <a href="https://watchman-two.vercel.app/signals">Open Dashboard</a>`;
+
+        await sendTelegramAlert(message);
       }
     }
 
