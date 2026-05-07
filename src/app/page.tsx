@@ -20,13 +20,23 @@ export default function Home() {
   // Anti-spam state: prevents the bot from texting you every 30 seconds
   const [hasAlerted, setHasAlerted] = useState<boolean>(false);
 
-  // --- 1. THE DATA PIPELINE (Only talks to CoinGecko) ---
+  // --- 1. THE DATA PIPELINE ---
   useEffect(() => {
     const fetchLiveMarketData = async () => {
       try {
         const url =
-          "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,binancecoin,cardano,chainlink,polygon&vs_currencies=usd&include_24hr_change=true";
+          "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,binancecoin,cardano,chainlink,dogecoin,shiba-inu,pepe,dogwifcoin&vs_currencies=usd&include_24hr_change=true";
+
         const response = await fetch(url);
+
+        // 🛡️ THE SHIELD: Check if CoinGecko is rejecting us before parsing!
+        if (!response.ok) {
+          throw new Error(
+            `API rejected request. Status: ${response.status}. We are likely throttled.`,
+          );
+        }
+
+        // If we pass the shield, it's safe to parse the JSON
         const data = await response.json();
 
         const formattedData: Asset[] = [
@@ -72,20 +82,49 @@ export default function Home() {
             price: data.chainlink.usd,
             change24h: data.chainlink.usd_24h_change,
           },
+          // The new Meme Division
+          {
+            id: "dogecoin",
+            name: "Dogecoin",
+            ticker: "DOGE",
+            price: data.dogecoin?.usd,
+            change24h: data.dogecoin?.usd_24h_change,
+          },
+          {
+            id: "shiba-inu",
+            name: "Shiba Inu",
+            ticker: "SHIB",
+            price: data["shiba-inu"]?.usd,
+            change24h: data["shiba-inu"]?.usd_24h_change,
+          },
+          {
+            id: "pepe",
+            name: "Pepe",
+            ticker: "PEPE",
+            price: data.pepe?.usd,
+            change24h: data.pepe?.usd_24h_change,
+          },
+          {
+            id: "dogwifcoin",
+            name: "Dogwifhat",
+            ticker: "WIF",
+            price: data.dogwifcoin?.usd,
+            change24h: data.dogwifcoin?.usd_24h_change,
+          },
         ];
 
         setMarketData(formattedData);
         setIsLoading(false);
       } catch (error) {
-        console.error("Watchman Fetch Failed:", error);
-        setIsLoading(false);
+        // Now, it will silently log the throttle message instead of crashing the UI
+        console.warn("Watchman Patrol Paused:", error);
       }
     };
 
     fetchLiveMarketData();
-    const interval = setInterval(fetchLiveMarketData, 60000); // Check every minute
+    const interval = setInterval(fetchLiveMarketData, 60000); // Strict 60-second limit
     return () => clearInterval(interval);
-  }, []); // <-- EMPTY ARRAY. This now only runs on page load and every 60 seconds.
+  }, []);
 
   // --- 2. THE WATCHMAN BRAIN (Reacts to the slider immediately) ---
   useEffect(() => {

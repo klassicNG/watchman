@@ -14,47 +14,60 @@ export async function GET(request: Request) {
       );
     }
 
-    const url =
-      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,binancecoin,cardano,chainlink&vs_currencies=usd&include_24hr_change=true";
-    const response = await fetch(url);
-    const data = await response.json();
+    // 1. THE ASSET RISK PROFILES (The new custom thresholds)
+    const targetAssets = [
+      // THE MAJORS: Tight thresholds because they move slower
+      { id: "bitcoin", ticker: "BTC", buyDip: -2.0, takeProfit: 3.0 },
+      { id: "ethereum", ticker: "ETH", buyDip: -3.0, takeProfit: 4.0 },
+      { id: "solana", ticker: "SOL", buyDip: -5.0, takeProfit: 6.0 },
 
-    const buyThreshold = -5; // Your target buy threshold
-    const sellThreshold = 5.0; // Your target sell threshold
-    const assets = [
-      { id: "bitcoin", ticker: "BTC" },
-      { id: "ethereum", ticker: "ETH" },
-      { id: "solana", ticker: "SOL" },
-      { id: "binancecoin", ticker: "BNB" },
-      { id: "cardano", ticker: "ADA" },
-      { id: "chainlink", ticker: "LINK" },
+      // THE MEMES: Extremely wide thresholds because they are chaotic
+      { id: "dogecoin", ticker: "DOGE", buyDip: -8.0, takeProfit: 10.0 },
+      { id: "shiba-inu", ticker: "SHIB", buyDip: -10.0, takeProfit: 12.0 },
+      { id: "pepe", ticker: "PEPE", buyDip: -15.0, takeProfit: 20.0 },
+      { id: "dogwifcoin", ticker: "WIF", buyDip: -15.0, takeProfit: 20.0 }, // WIF is highly volatile
     ];
 
-    for (const asset of assets) {
-      const change = data[asset.id].usd_24h_change;
+    // 2. Dynamically build the CoinGecko URL based on our array
+    const coinIds = targetAssets.map((asset) => asset.id).join(",");
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinIds}&vs_currencies=usd&include_24hr_change=true`;
 
-      if (change <= buyThreshold) {
-        // THE UPDATED MESSAGE FORMAT WITH THE LINK
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("CoinGecko API Throttled or Offline");
+    const data = await response.json();
+
+    // 3. THE EXECUTION ENGINE (Using specific thresholds)
+    for (const asset of targetAssets) {
+      const marketData = data[asset.id];
+      if (!marketData) continue; // Skip if CoinGecko didn't return data for this coin
+
+      const change = marketData.usd_24h_change;
+
+      // BUY SIGNAL logic using the asset's specific buyDip number
+      if (change <= asset.buyDip) {
         const message =
-          `🚨 <b>WATCHMAN SIGNAL: STRONG BUY</b> 🚨\n\n` +
-          `<b>${asset.ticker}</b> is heavily oversold (Down ${change.toFixed(2)}%).\n` +
-          `Historically, this indicates a mean-reversion bounce.\n\n` +
-          `📊 <b>Action Hub:</b> <a href="https://watchman-two.vercel.app/signals">Open Dashboard</a>`;
+          `🚨 <b>WATCHMAN: ${asset.ticker} BUY ZONE</b> 🚨\n\n` +
+          `<b>${asset.ticker}</b> has crashed <b>${change.toFixed(2)}%</b>.\n` +
+          `Target Buy Threshold: ${asset.buyDip}%\n\n` +
+          `📊 <a href="https://watchman-two.vercel.app/signals">Open Klassic Command Center</a>`;
 
         await sendTelegramAlert(message);
-      } else if (change >= sellThreshold) {
+      }
+      // SELL SIGNAL logic using the asset's specific takeProfit number
+      else if (change >= asset.takeProfit) {
         const message =
-          `🚨 <b>WATCHMAN SIGNAL: STRONG SELL</b> 🚨\n\n` +
-          `<b>${asset.ticker}</b> is heavily overbought (Up ${change.toFixed(2)}%).\n` +
-          `Historically, this indicates a mean-reversion pullback.\n\n` +
-          `📊 <b>Action Hub:</b> <a href="https://watchman-two.vercel.app/signals">Open Dashboard</a>`;
+          `✅ <b>WATCHMAN: ${asset.ticker} TAKE PROFIT</b> ✅\n\n` +
+          `<b>${asset.ticker}</b> is pumping! Up <b>${change.toFixed(2)}%</b>.\n` +
+          `Target Sell Threshold: +${asset.takeProfit}%\n\n` +
+          `💰 Secure your gains.`;
+
         await sendTelegramAlert(message);
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: "Watchman patrol complete.",
+      message: "Watchman patrol complete with custom risk profiles.",
     });
   } catch (error) {
     return NextResponse.json(
