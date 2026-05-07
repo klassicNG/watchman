@@ -20,6 +20,7 @@ export default function Home() {
   // Anti-spam state: prevents the bot from texting you every 30 seconds
   const [hasAlerted, setHasAlerted] = useState<boolean>(false);
 
+  // --- 1. THE DATA PIPELINE (Only talks to CoinGecko) ---
   useEffect(() => {
     const fetchLiveMarketData = async () => {
       try {
@@ -75,24 +76,6 @@ export default function Home() {
 
         setMarketData(formattedData);
         setIsLoading(false);
-
-        // --- WATCHMAN LOGIC START ---
-        const btc = formattedData.find((a) => a.id === "bitcoin");
-
-        // If Bitcoin is below threshold AND we haven't sent a text yet
-        if (btc && btc.change24h <= threshold && !hasAlerted) {
-          const msg = `🚨 <b>WATCHMAN ALERT</b> 🚨\n\n<b>BTC</b> has breached your <b>${threshold}%</b> threshold!\n\nCurrent Price: $${btc.price.toLocaleString()}\nChange: ${btc.change24h.toFixed(2)}%`;
-
-          await sendTelegramAlert(msg);
-          setHasAlerted(true); // Lock the alarm
-        }
-
-        // If Bitcoin recovers above the threshold, reset the alarm lock
-        if (btc && btc.change24h > threshold && hasAlerted) {
-          setHasAlerted(false);
-          console.log("Market recovered. Resetting Watchman alert lock.");
-        }
-        // --- WATCHMAN LOGIC END ---
       } catch (error) {
         console.error("Watchman Fetch Failed:", error);
         setIsLoading(false);
@@ -102,7 +85,32 @@ export default function Home() {
     fetchLiveMarketData();
     const interval = setInterval(fetchLiveMarketData, 60000); // Check every minute
     return () => clearInterval(interval);
-  }, [threshold, hasAlerted]); // We add threshold here so the logic re-runs when you move the slider
+  }, []); // <-- EMPTY ARRAY. This now only runs on page load and every 60 seconds.
+
+  // --- 2. THE WATCHMAN BRAIN (Reacts to the slider immediately) ---
+  useEffect(() => {
+    const checkThresholds = async () => {
+      if (marketData.length === 0) return; // Don't run if data hasn't loaded yet
+
+      const btc = marketData.find((a) => a.id === "bitcoin");
+
+      // If Bitcoin is below threshold AND we haven't sent a text yet
+      if (btc && btc.change24h <= threshold && !hasAlerted) {
+        const msg = `🚨 <b>WATCHMAN ALERT</b> 🚨\n\n<b>BTC</b> has breached your <b>${threshold}%</b> threshold!\n\nCurrent Price: $${btc.price.toLocaleString()}\nChange: ${btc.change24h.toFixed(2)}%`;
+
+        await sendTelegramAlert(msg);
+        setHasAlerted(true); // Lock the alarm
+      }
+
+      // If Bitcoin recovers above the threshold, reset the alarm lock
+      if (btc && btc.change24h > threshold && hasAlerted) {
+        setHasAlerted(false);
+        console.log("Market recovered. Resetting Watchman alert lock.");
+      }
+    };
+
+    checkThresholds();
+  }, [marketData, threshold, hasAlerted]); // <-- THIS reacts to the slider!
 
   return (
     <main className="min-h-screen bg-black text-gray-100 p-8 md:p-24">
