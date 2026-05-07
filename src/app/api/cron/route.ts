@@ -19,7 +19,8 @@ export async function GET(request: Request) {
     const response = await fetch(url);
     const data = await response.json();
 
-    const threshold = -5; // Your target threshold
+    const buyThreshold = -5; // Your target buy threshold
+    const sellThreshold = 5.0; // Your target sell threshold
     const assets = [
       { id: "bitcoin", ticker: "BTC" },
       { id: "ethereum", ticker: "ETH" },
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
     for (const asset of assets) {
       const change = data[asset.id].usd_24h_change;
 
-      if (change <= threshold) {
+      if (change <= buyThreshold) {
         // THE UPDATED MESSAGE FORMAT WITH THE LINK
         const message =
           `🚨 <b>WATCHMAN SIGNAL: STRONG BUY</b> 🚨\n\n` +
@@ -40,6 +41,13 @@ export async function GET(request: Request) {
           `Historically, this indicates a mean-reversion bounce.\n\n` +
           `📊 <b>Action Hub:</b> <a href="https://watchman-two.vercel.app/signals">Open Dashboard</a>`;
 
+        await sendTelegramAlert(message);
+      } else if (change >= sellThreshold) {
+        const message =
+          `🚨 <b>WATCHMAN SIGNAL: STRONG SELL</b> 🚨\n\n` +
+          `<b>${asset.ticker}</b> is heavily overbought (Up ${change.toFixed(2)}%).\n` +
+          `Historically, this indicates a mean-reversion pullback.\n\n` +
+          `📊 <b>Action Hub:</b> <a href="https://watchman-two.vercel.app/signals">Open Dashboard</a>`;
         await sendTelegramAlert(message);
       }
     }
